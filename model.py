@@ -51,6 +51,7 @@ class DSC_RS(nn.Module):
 
         self.wide_deep = WideAndDeepModel(wide_deep_params)
         self.ncf = NCFModel(ncf_params)
+        self.autoencoder = TextAutoencoder(**autoencoder_params)
 
         self.processing_layer = nn.Linear(wide_deep_params['output_dim'] + ncf_params['output_dim'], FLAGS.bert_input_dim)
         self.additional_classifier = nn.Linear(FLAGS.bert_input_dim + FLAGS.bert_output_dim, FLAGS.num_labels)
@@ -60,15 +61,17 @@ class DSC_RS(nn.Module):
         # Get Cp and Cu from the respective models
         C_p = self.wide_deep(wide_input, deep_input)
         C_u = self.ncf(user_input, item_input)
+        # Get Z_d from the autoencoder
+        Z_d, _ = self.autoencoder(text_input)
 
         # Process C_p and C_u before concatenation
         combined_Cp_Cu = self.processing_layer(torch.cat([C_p, C_u], dim=1))
-        # Pass inputs to the document-level BERT model and obtain loss and logits
+        combined_features = torch.cat([combined_Cp_Cu, Z_d], dim=1)
+
         x_loss, x_logits = self.document_bert(input_ids, attention_mask, token_type_ids, labels)
-        # Combine the processed C_p and C_u with the BERT output
-        combined_features = torch.cat([x_logits, combined_Cp_Cu], dim=1)
-        # Pass the combined features through the additional classifier
-        classifier_output = self.additional_classifier(combined_features)
+        combined_features_with_logits = torch.cat([x_logits, combined_features], dim=1)
+
+        classifier_output = self.additional_classifier(combined_features_with_logits)
 
         return x_loss, classifier_output
 
@@ -85,4 +88,9 @@ ncf_params = {
     'num_items': 1000,
     'general_dim': 8,
     'hidden_units': [64, 32, 16]
+}
+
+autoencoder_params = {
+    'input_dim': 1024,  # Replace with the size of your text vector
+    'encoding_dim': 256  # Size of the encoded representation
 }
