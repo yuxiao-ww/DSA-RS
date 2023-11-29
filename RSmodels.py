@@ -17,10 +17,9 @@ class WideAndDeepModel(nn.Module):
     def forward(self, wide_input, deep_input):
         wide_out = self.wide(wide_input)
         deep_out = self.deep(deep_input)
-        combined_out = wide_out + deep_out  # assuming output_dim=1 for a regression or binary classification task
-        return torch.sigmoid(combined_out)  # use sigmoid for binary classification
+        combined_out = wide_out + deep_out
+        return torch.sigmoid(combined_out)
 
-# Example initialization:
 # model = WideAndDeepModel(wide_dim=10, deep_dim=20, hidden_units=[64, 32], output_dim=1)
 
 
@@ -44,5 +43,4 @@ class NCFModel(nn.Module):
         output = self.mlp(vector)
         return torch.sigmoid(output)  # use sigmoid for binary classification
 
-# Example initialization:
 # model = NCFModel(num_users=1000, num_items=1000, general_dim=8, hidden_units=[64, 32])
