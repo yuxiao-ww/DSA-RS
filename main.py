@@ -176,7 +176,7 @@ if __name__ == '__main__':
 
     data_examples = [train_set, dev_set, test_set]
 
-    model = documentLevelBert(FLAGS, config)
+    model = DSC_RS(FLAGS, config)
     criterion = CrossEntropyLoss()
 
     loss_step = 0.0
