@@ -42,3 +42,47 @@ class documentLevelBert(nn.Module):
         # print(x_logits.shape)
         x_logits = self.softmax(x_logits)
         return x_loss, x_logits
+
+
+class DSC_RS(nn.Module):
+    def __init__(self, FLAGS, config, num_embeddings=None, up_vocab=None):
+        super(DSC_RS, self).__init__()
+        self.document_bert = documentLevelBert(FLAGS, config)
+
+        self.wide_deep = WideAndDeepModel(wide_deep_params)
+        self.ncf = NCFModel(ncf_params)
+
+        self.processing_layer = nn.Linear(wide_deep_params['output_dim'] + ncf_params['output_dim'], FLAGS.bert_input_dim)
+        self.additional_classifier = nn.Linear(FLAGS.bert_input_dim + FLAGS.bert_output_dim, FLAGS.num_labels)
+
+    def forward(self, input_ids, attention_mask, token_type_ids, labels, wide_input, deep_input, user_input,
+                item_input):
+        # Get Cp and Cu from the respective models
+        C_p = self.wide_deep(wide_input, deep_input)
+        C_u = self.ncf(user_input, item_input)
+
+        # Process C_p and C_u before concatenation
+        combined_Cp_Cu = self.processing_layer(torch.cat([C_p, C_u], dim=1))
+        # Pass inputs to the document-level BERT model and obtain loss and logits
+        x_loss, x_logits = self.document_bert(input_ids, attention_mask, token_type_ids, labels)
+        # Combine the processed C_p and C_u with the BERT output
+        combined_features = torch.cat([x_logits, combined_Cp_Cu], dim=1)
+        # Pass the combined features through the additional classifier
+        classifier_output = self.additional_classifier(combined_features)
+
+        return x_loss, classifier_output
+
+
+wide_deep_params = {
+    'wide_dim': 100,
+    'deep_dim': 64,
+    'hidden_units': [128, 64],
+    'output_dim': 1
+}
+
+ncf_params = {
+    'num_users': 10000,
+    'num_items': 1000,
+    'general_dim': 8,
+    'hidden_units': [64, 32, 16]
+}
